@@ -4,3 +4,5 @@ local.properties
 **/build/
 *.iml
 .cxx/
+app/src/main/assets/firebase.properties
+app/google-services.json

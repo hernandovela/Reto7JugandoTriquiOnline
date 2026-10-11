@@ -1,208 +1,73 @@
-package com.hernandovela.reto6;
-
-import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.SharedPreferences;
-import android.os.*;
-import android.media.MediaPlayer;
-import android.view.*;
+package com.hernandovela.reto7;
+import android.app.*;
+import android.os.Bundle;
+import android.graphics.Color;
 import android.widget.*;
-
-/** Bundle: transient match. SharedPreferences: scores and settings across launches. */
+import com.google.firebase.*;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.*;
 public final class MainActivity extends Activity {
-    private final TicTacToeGame game=new TicTacToeGame();
-    private final Handler handler=new Handler(Looper.getMainLooper());
-    private BoardView board;
-    private TextView status, detail, score;
-    private SharedPreferences prefs;
-    private boolean computerTurn, gameOver, soundEnabled, resumed;
-    private char goFirst='X';
-    private int wins, draws, losses;
-    private GameAudio audio;
-    private AlertDialog resultDialog;
-    private boolean resultPopupVisible;
-    /** Keeps a playing sound alive across Activity recreation without restarting it. */
-    private static final class GameAudio {
-        MediaPlayer human, computer, victory, defeat;
-        void pauseAll() {
-            for(MediaPlayer player:new MediaPlayer[]{human,computer,victory,defeat})
-                if(player!=null && player.isPlaying()) player.pause();
-        }
-        void release() {
-            for(MediaPlayer player:new MediaPlayer[]{human,computer,victory,defeat})
-                if(player!=null) player.release();
-            human=computer=victory=defeat=null;
-        }
-    }
-    private final Runnable computerMove=()->{
-        if(!resumed || !computerTurn || gameOver) return;
-        if(game.setMove('O',game.getComputerMove())) play(audio.computer);
-        computerTurn=false; finishMove();
-    };
-    @Override public void onCreate(Bundle state) {
-        super.onCreate(state);
-        audio=(GameAudio)getLastNonConfigurationInstance();
-        if(audio==null) audio=new GameAudio();
-        // Root Back must finish this match, including Android's predictive back path.
-        if(Build.VERSION.SDK_INT>=33) getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
-            android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::finish);
-        prefs=getSharedPreferences("ttt_prefs",MODE_PRIVATE);
-        wins=prefs.getInt("mHumanWins",0); losses=prefs.getInt("mComputerWins",0); draws=prefs.getInt("mTies",0);
-        soundEnabled=prefs.getBoolean("sound",true);
-        int level=prefs.getInt("difficulty",2);
-        game.setDifficulty(TicTacToeGame.Difficulty.values()[Math.max(0,Math.min(2,level))]);
-        if(state!=null) {
-            game.setBoardState(state.getCharArray("board"));
-            computerTurn=state.getBoolean("computerTurn");
-            gameOver=state.getBoolean("mGameOver");
-            goFirst=state.getChar("mGoFirst",'X');
-            resultPopupVisible=state.getBoolean("resultPopupVisible");
-        }
-        setContentView(R.layout.main);
-        board=findViewById(R.id.board); board.setGame(game); board.setMoveListener(this::humanMove);
-        status=findViewById(R.id.status); detail=findViewById(R.id.detail); score=findViewById(R.id.score);
-        findViewById(R.id.restart).setOnClickListener(v->newGame());
-        findViewById(R.id.options).setOnClickListener(v->{
-            PopupMenu popup=new PopupMenu(this,v); popup.inflate(R.menu.options_menu);
-            popup.getMenu().findItem(R.id.sound).setChecked(soundEnabled);
-            popup.setOnMenuItemClickListener(this::onOptionsItemSelected); popup.show();
-        });
-        View root=findViewById(R.id.root);
-        final int padding=Math.round((getResources().getConfiguration().orientation==2?12:0)*getResources().getDisplayMetrics().density);
-        root.setOnApplyWindowInsetsListener((v,insets)->{
-            if(Build.VERSION.SDK_INT>=30) {
-                android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());
-                v.setPadding(bars.left+padding,bars.top+padding,bars.right+padding,bars.bottom+padding);
-            } else v.setPadding(insets.getSystemWindowInsetLeft()+padding,insets.getSystemWindowInsetTop()+padding,insets.getSystemWindowInsetRight()+padding,insets.getSystemWindowInsetBottom()+padding);
-            return insets;
-        });
-        root.requestApplyInsets(); render();
-        if(state!=null && state.getCharSequence("info")!=null) status.setText(state.getCharSequence("info"));
-    }
-    private void humanMove(int position) {
-        if(computerTurn || gameOver || !game.setMove('X',position)) return;
-        play(audio.human);
-        computerTurn=game.result()==TicTacToeGame.PLAYING;
-        finishMove(); scheduleComputer();
-    }
-    private void scheduleComputer() {
-        handler.removeCallbacks(computerMove);
-        if(resumed && computerTurn && !gameOver) handler.postDelayed(computerMove,1000);
-    }
-    private void finishMove() {
-        int result=game.result();
-        if(!gameOver && result!=TicTacToeGame.PLAYING) {
-            gameOver=true; computerTurn=false;
-            if(result==TicTacToeGame.HUMAN_WINS) wins++; else if(result==TicTacToeGame.COMPUTER_WINS) losses++; else draws++;
-            savePreferences();
-            audio.pauseAll();
-            if(result==TicTacToeGame.HUMAN_WINS) play(audio.victory);
-            else if(result==TicTacToeGame.COMPUTER_WINS) play(audio.defeat);
-            resultPopupVisible=result==TicTacToeGame.HUMAN_WINS || result==TicTacToeGame.COMPUTER_WINS;
-        }
-        render();
-        showResultPopup();
-    }
-    private void render() {
-        int result=game.result(); displayScores();
-        status.setTextColor(getResources().getColor(result==TicTacToeGame.HUMAN_WINS ? R.color.x_label : result==TicTacToeGame.COMPUTER_WINS ? R.color.o_label : R.color.text_primary,null));
-        if(result==TicTacToeGame.HUMAN_WINS) status.setText("¡Ganaste!");
-        else if(result==TicTacToeGame.COMPUTER_WINS) status.setText("Android gana");
-        else if(result==TicTacToeGame.DRAW) status.setText("¡Empate!");
-        else status.setText(computerTurn ? "Android está pensando…" : "Tu turno");
-        String[] levels={"Fácil","Normal","Experto"};
-        detail.setText("Tú × · Android ○ · "+levels[game.getDifficulty().ordinal()]);
-        StringBuilder description=new StringBuilder("Tablero de tres en raya. ");
-        for(int row=0;row<3;row++) {
-            description.append("Fila ").append(row+1).append(": ");
-            for(int col=0;col<3;col++) {
-                char occupant=game.getBoardOccupant(row*3+col);
-                description.append(occupant==' ' ? "vacía" : String.valueOf(occupant)).append(col==2 ? ". " : ", ");
-            }
-        }
-        board.setContentDescription(description.toString());
-        board.setEnabled(!computerTurn && !gameOver); board.invalidate();
-    }
-    private void displayScores() { score.setText("Tú  "+wins+"   ·   Empates  "+draws+"   ·   Android  "+losses); }
-    private void showResultPopup() {
-        if(!resumed || !gameOver || !resultPopupVisible || (resultDialog!=null && resultDialog.isShowing())) return;
-        boolean victory=game.result()==TicTacToeGame.HUMAN_WINS;
-        View content=getLayoutInflater().inflate(R.layout.result_popup,null);
-        TextView title=content.findViewById(R.id.result_title);
-        title.setText(victory ? R.string.victory_title : R.string.defeat_title);
-        title.setTextColor(getResources().getColor(victory ? R.color.x_label : R.color.o_label,null));
-        if(Build.VERSION.SDK_INT>=28) title.setAccessibilityHeading(true);
-        ((TextView)content.findViewById(R.id.result_message)).setText(victory ? R.string.victory_message : R.string.defeat_message);
-        ((ImageView)content.findViewById(R.id.result_icon)).setImageResource(victory ? R.drawable.ic_trophy : R.drawable.ic_rematch);
-        resultDialog=new AlertDialog.Builder(this).setView(content)
-            .setPositiveButton(R.string.play_again,(dialog,which)->newGame())
-            .setNegativeButton(R.string.view_board,(dialog,which)->{})
-            .create();
-        resultDialog.setCanceledOnTouchOutside(false);
-        resultDialog.setOnDismissListener(dialog->{ resultPopupVisible=false; resultDialog=null; });
-        resultDialog.show();
-        resultDialog.getWindow().setBackgroundDrawable(getDrawable(R.drawable.result_background));
-        resultDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(getResources().getColor(victory ? R.color.x_label : R.color.o_label,null));
-    }
-    private void closeResultPopup() {
-        resultPopupVisible=false;
-        if(resultDialog!=null) { resultDialog.dismiss(); resultDialog=null; }
-    }
-    private void newGame() {
-        closeResultPopup();
-        audio.pauseAll(); handler.removeCallbacks(computerMove); game.clearBoard(); gameOver=false;
-        goFirst=goFirst=='X'?'O':'X'; computerTurn=goFirst=='O'; render(); scheduleComputer();
-    }
-    @Override public boolean onCreateOptionsMenu(Menu menu) { getMenuInflater().inflate(R.menu.options_menu,menu); return true; }
-    @Override public boolean onOptionsItemSelected(MenuItem item) {
-        int id=item.getItemId();
-        if(id==R.id.new_game) newGame();
-        else if(id==R.id.reset_scores) { wins=draws=losses=0; savePreferences(); displayScores(); }
-        else if(id==R.id.sound) { soundEnabled=!soundEnabled; if(!soundEnabled) audio.pauseAll(); savePreferences(); item.setChecked(soundEnabled); }
-        else if(id==R.id.difficulty) new AlertDialog.Builder(this).setTitle("Dificultad").setSingleChoiceItems(new String[]{"Fácil","Normal","Experto"},game.getDifficulty().ordinal(),(dialog,which)->{
-            game.setDifficulty(TicTacToeGame.Difficulty.values()[which]); savePreferences(); render(); dialog.dismiss();
-        }).setNegativeButton("Cancelar",null).show();
-        else if(id==R.id.about) new AlertDialog.Builder(this).setTitle("Reto 6").setMessage("Cambio de orientación y guardado de estado.\nLa partida y el turno se conservan al girar. Los marcadores y la dificultad se guardan entre aperturas.\nBasado en el reto de Frank McCown, Harding University (CC BY 3.0).").setPositiveButton("Aceptar",null).show();
-        else return super.onOptionsItemSelected(item);
-        return true;
-    }
-    private void savePreferences() {
-        prefs.edit().putInt("mHumanWins",wins).putInt("mComputerWins",losses).putInt("mTies",draws).putInt("difficulty",game.getDifficulty().ordinal()).putBoolean("sound",soundEnabled).commit();
-    }
-    private void play(MediaPlayer player) { if(soundEnabled && player!=null) { player.seekTo(0); player.start(); } }
-    @Override protected void onResume() {
-        super.onResume(); resumed=true;
-        if(audio.human==null) {
-            audio.human=MediaPlayer.create(getApplicationContext(),R.raw.human_move);
-            audio.computer=MediaPlayer.create(getApplicationContext(),R.raw.computer_move);
-            audio.victory=MediaPlayer.create(getApplicationContext(),R.raw.victory);
-            audio.defeat=MediaPlayer.create(getApplicationContext(),R.raw.defeat);
-        }
-        scheduleComputer(); showResultPopup();
-    }
-    @Override protected void onPause() {
-        resumed=false; handler.removeCallbacks(computerMove);
-        super.onPause();
-    }
-    // Legacy fallback only: API 33+ uses the OnBackInvokedDispatcher registered above.
-    @android.annotation.SuppressLint("GestureBackNavigation")
-    @Override public void onBackPressed() { finish(); }
-    @Override public Object onRetainNonConfigurationInstance() { return audio; }
-    @Override protected void onStop() {
-        savePreferences();
-        if(!isChangingConfigurations()) audio.release();
-        super.onStop();
-    }
-    @Override protected void onDestroy() {
-        // The new Activity restores visibility from Bundle; do not mark it dismissed on rotation.
-        if(resultDialog!=null) { resultDialog.setOnDismissListener(null); resultDialog.dismiss(); resultDialog=null; }
-        if(!isChangingConfigurations()) audio.release();
-        super.onDestroy();
-    }
-    @Override protected void onSaveInstanceState(Bundle out) {
-        out.putCharArray("board",game.getBoardState()); out.putBoolean("computerTurn",computerTurn);
-        out.putBoolean("resultPopupVisible",resultPopupVisible);
-        out.putBoolean("mGameOver",gameOver); out.putChar("mGoFirst",goFirst); out.putCharSequence("info",status.getText());
-        super.onSaveInstanceState(out);
-    }
+ OnlineRepository repo; ListenerRegistration listener;
+ LinearLayout content,rooms; TextView status; BoardView board;
+ String gameId; boolean busy,connected; DocumentSnapshot current;
+ final TicTacToeGame game=new TicTacToeGame();
+ @Override public void onCreate(Bundle state){
+  super.onCreate(state);gameId=getPreferences(0).getString("gameId",null);
+  shell("Conectando con Firebase…");
+  try{
+   if(FirebaseApp.getApps(this).isEmpty()){
+    java.util.Properties p=new java.util.Properties();
+    try(java.io.InputStream in=getAssets().open("firebase.properties")){p.load(in);}
+    FirebaseApp.initializeApp(this,new FirebaseOptions.Builder().setProjectId(p.getProperty("projectId")).setApplicationId(p.getProperty("applicationId")).setApiKey(p.getProperty("apiKey")).build());
+   }
+   repo=new OnlineRepository();
+   FirebaseAuth a=FirebaseAuth.getInstance();
+   if(a.getCurrentUser()!=null)ready();else a.signInAnonymously().addOnSuccessListener(r->ready()).addOnFailureListener(this::failure);
+  }catch(Exception e){status.setText("Falta configurar Firebase");label("Consulta README.md y configura app/src/main/assets/firebase.properties con los datos de la aplicación Android registrada en Firebase.");}
+ }
+ int dp(int n){return (int)(n*getResources().getDisplayMetrics().density);}
+ TextView label(String s){TextView v=new TextView(this);v.setText(s);v.setTextSize(18);v.setTextColor(Color.WHITE);v.setPadding(0,dp(8),0,dp(8));content.addView(v);return v;}
+ void shell(String title){
+  if(listener!=null){listener.remove();listener=null;}
+  ScrollView scroll=new ScrollView(this);content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(22),dp(36),dp(22),dp(24));content.setBackgroundColor(Color.rgb(15,23,42));scroll.addView(content);setContentView(scroll);label("TRIQUI ONLINE").setTextSize(28);status=label(title);board=null;
+ }
+ void button(String s,Runnable action){Button b=new Button(this);b.setText(s);content.addView(b);b.setOnClickListener(v->action.run());}
+ void ready(){if(isDestroyed()||isFinishing())return;if(gameId==null)lobby();else watch();}
+ void select(String id){gameId=id;getPreferences(0).edit().putString("gameId",id).apply();watch();}
+ void lobby(){
+  shell("Partidas disponibles · 2 jugadores");
+  EditText name=new EditText(this);name.setHint("Nombre de la partida");name.setTextColor(Color.WHITE);name.setHintTextColor(Color.LTGRAY);content.addView(name);
+  button("Crear partida",()->{if(busy)return;busy=true;String s=name.getText().toString().trim();if(s.isEmpty())s="Partida de triqui";if(s.length()>40)s=s.substring(0,40);repo.create(s).addOnSuccessListener(r->{busy=false;select(r.getId());}).addOnFailureListener(this::failure);});
+  rooms=new LinearLayout(this);rooms.setOrientation(1);content.addView(rooms);
+  listener=repo.games().whereEqualTo("status","waiting").limit(50).addSnapshotListener(MetadataChanges.INCLUDE,(snapshot,error)->{
+   if(error!=null){failure(error);return;}if(gameId!=null)return;rooms.removeAllViews();
+   status.setText(snapshot.getMetadata().isFromCache()?"Reconectando… lista guardada":"Partidas disponibles · 2 jugadores");
+   if(snapshot.isEmpty()){TextView empty=new TextView(this);empty.setText("No hay partidas. ¡Crea la primera!");empty.setTextColor(Color.WHITE);rooms.addView(empty);}
+   for(DocumentSnapshot g:snapshot.getDocuments()){
+    boolean own=repo.uid().equals(g.getString("host"));Button b=new Button(this);b.setText(g.getString("name")+(own?" · Reanudar":" · Unirse"));rooms.addView(b);
+    b.setOnClickListener(v->{if(busy)return;if(own){select(g.getId());return;}busy=true;repo.change(g.getId(),-1).addOnSuccessListener(r->{busy=false;select(g.getId());}).addOnFailureListener(this::failure);});
+   }
+  });
+ }
+ void watch(){
+  shell("Cargando partida…");label("Código: "+gameId);
+  board=new BoardView(this);board.setGame(game);board.setEnabled(false);content.addView(board,new LinearLayout.LayoutParams(-1,dp(320)));
+  board.setMoveListener(cell->{if(busy||!connected)return;busy=true;board.setEnabled(false);repo.change(gameId,cell).addOnSuccessListener(r->{busy=false;render();}).addOnFailureListener(this::failure);});
+  button("Salir y volver a la lista",()->new AlertDialog.Builder(this).setMessage("Salir cierra la partida para ambos jugadores.").setNegativeButton("Cancelar",null).setPositiveButton("Salir",(d,w)->{
+   if(busy)return;busy=true;repo.change(gameId,-2).addOnSuccessListener(r->{busy=false;gameId=null;current=null;getPreferences(0).edit().remove("gameId").apply();lobby();}).addOnFailureListener(this::failure);
+  }).show());
+  listener=repo.games().document(gameId).addSnapshotListener(MetadataChanges.INCLUDE,(g,e)->{if(e!=null){failure(e);return;}current=g;connected=!g.getMetadata().isFromCache();render();});
+ }
+ void render(){
+  if(current==null||board==null)return;
+  if(!current.exists()){status.setText("La partida no existe.");board.setEnabled(false);button("Volver a la lista",()->{gameId=null;getPreferences(0).edit().remove("gameId").apply();lobby();});return;}
+  String mark=repo.uid().equals(current.getString("host"))?"X":repo.uid().equals(current.getString("guest"))?"O":"";
+  String phase=current.getString("status"),turn=current.getString("turn");
+  game.restore(String.join("",(java.util.List<String>)current.get("board")));board.invalidate();
+  String s="waiting".equals(phase)?"Eres X · Esperando al segundo jugador…":"playing".equals(phase)?"Eres "+mark+" · "+(mark.equals(turn)?"Tu turno":"Turno del rival"):"draw".equals(phase)?"¡Empate!":"closed".equals(phase)?"Partida cerrada":mark.equals(phase)?"¡Ganaste!":"Ganó "+phase;
+  status.setText(connected?s:"Sin conexión · Reconectando…");board.setEnabled(connected&&!busy&&!mark.isEmpty()&&"playing".equals(phase)&&mark.equals(turn));
+ }
+ void failure(Exception e){busy=false;if(isDestroyed()||isFinishing())return;Toast.makeText(this,"No se pudo completar: "+e.getMessage(),Toast.LENGTH_LONG).show();if(board!=null)render();else status.setText("Error de conexión. Revisa Internet y Firebase.");}
+ @Override public void onBackPressed(){if(gameId!=null)new AlertDialog.Builder(this).setMessage("La partida se conservará para reanudar al abrir la app.").setPositiveButton("Cerrar app",(d,w)->finish()).setNegativeButton("Continuar",null).show();else super.onBackPressed();}
+ @Override protected void onDestroy(){if(listener!=null)listener.remove();super.onDestroy();}
 }

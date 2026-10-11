@@ -1,4 +1,4 @@
-package com.hernandovela.reto6;
+package com.hernandovela.reto7;
 
 import java.util.Arrays;
 import java.util.Random;

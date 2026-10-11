@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  match /games/{id} {
+   function signed(){return request.auth != null;}
+   function member(){return signed() && request.auth.uid in [resource.data.host,resource.data.guest];}
+   function win(b,m){
+    return (b[0]==m && b[1]==m && b[2]==m) || (b[3]==m && b[4]==m && b[5]==m) ||
+     (b[6]==m && b[7]==m && b[8]==m) || (b[0]==m && b[3]==m && b[6]==m) ||
+     (b[1]==m && b[4]==m && b[7]==m) || (b[2]==m && b[5]==m && b[8]==m) ||
+     (b[0]==m && b[4]==m && b[8]==m) || (b[2]==m && b[4]==m && b[6]==m);
+   }
+   function outcome(b,m){return win(b,m)?m:!b.hasAny([' '])?'draw':'playing';}
+   function cell(i,m){
+    let old=resource.data.board;
+    let next=request.resource.data.board;
+    return old[i]==' ' && next[i]==m &&
+     (i==0 || old[0]==next[0]) && (i==1 || old[1]==next[1]) && (i==2 || old[2]==next[2]) && (i==3 || old[3]==next[3]) && (i==4 || old[4]==next[4]) && (i==5 || old[5]==next[5]) && (i==6 || old[6]==next[6]) && (i==7 || old[7]==next[7]) && (i==8 || old[8]==next[8]);
+   }
+   function move(){
+    let r=resource.data;let n=request.resource.data;let m=r.turn;
+    return member() && r.status=='playing' &&
+     request.auth.uid==(m=='X'?r.host:r.guest) &&
+     n.diff(r).affectedKeys().hasOnly(['board','turn','status']) &&
+     n.board is list && n.board.size()==9 && n.board.hasOnly([' ','X','O']) &&
+     (cell(0,m)||cell(1,m)||cell(2,m)||cell(3,m)||cell(4,m)||cell(5,m)||cell(6,m)||cell(7,m)||cell(8,m)) &&
+     n.turn==(m=='X'?'O':'X') && n.status==outcome(n.board,m);
+   }
+   allow read: if signed();
+   allow create: if signed() &&
+    request.resource.data.keys().hasOnly(['host','guest','name','board','turn','status','createdAt']) &&
+    request.resource.data.host==request.auth.uid && request.resource.data.guest=='' &&
+    request.resource.data.name is string && request.resource.data.name.size()>0 && request.resource.data.name.size()<=40 &&
+    request.resource.data.board==[' ',' ',' ',' ',' ',' ',' ',' ',' '] && request.resource.data.turn=='X' &&
+    request.resource.data.status=='waiting' && request.resource.data.createdAt==request.time;
+   allow update: if signed() && (
+    (resource.data.status=='waiting' && resource.data.guest=='' &&
+     request.auth.uid!=resource.data.host && request.resource.data.guest==request.auth.uid &&
+     request.resource.data.status=='playing' &&
+     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['guest','status'])) ||
+    (member() && resource.data.status in ['waiting','playing'] && request.resource.data.status=='closed' &&
+     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])) || move());
+   allow delete: if false;
+  }
+ }
+}

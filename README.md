@@ -1,38 +1,37 @@
-# Reto 6: Cambio de orientación y guardando estado
+# Reto 7 · Jugando Triqui Online
 
-Proyecto Android Studio independiente, Java y vistas XML. Paquete `com.hernandovela.reto6`. Android 7.0 (API 24) o superior; compile/target SDK 37; AGP 9.3.2; Gradle 9.5; JDK incluido en Android Studio.
+Extensión del proyecto Reto 6 de Hernando Vela. Android nativo Java, tablero Canvas y recursos gráficos originales. Dos dispositivos conectados al mismo proyecto Firebase juegan por Internet.
 
-## Funcionalidad
-- Tres en raya contra Android, tablero Canvas con imágenes y sonidos.
-- Popups de resultado: celebración con trofeo al ganar y aviso «Perdiste» cuando gana Android. Permiten volver a jugar o ver el tablero; se conservan al girar sin volver a contar el resultado.
-- Sonido de victoria al ganar y sonido diferente de derrota cuando gana Android. Respetan la opción Sonido; al girar, el audio en curso continúa sin reiniciarse.
-- Diseño visual: X azul, O frambuesa, tablero claro y fondo azul oscuro con degradado. Botón principal destacado y resultado con el color del ganador.
-- Vertical: tablero de 250 dp y controles en columna. Horizontal: tablero de 270 dp a la izquierda y controles desplazables a la derecha, sin barra de título.
-- `onSaveInstanceState` conserva tablero (copia de char[]), fin de partida, mensaje, primer jugador y turno actual. Android recrea la Activity normalmente: no se bloquea orientación ni se usa configChanges.
-- `SharedPreferences` (`ttt_prefs`) conserva victorias, empates, dificultad (ordinal del enum) y sonido. Se escribe al cambiar y en onStop.
-- Opciones con icono para reiniciar marcadores; sin opción Salir.
-- Dificultades Fácil (aleatoria), Normal (gana/bloquea) y Experto (minimax).
-- El Handler se cancela en onPause y se programa una sola respuesta en onResume si sigue siendo turno de Android. Girar durante la espera no duplica movimientos ni deja el turno bloqueado.
-- Nueva partida alterna quién empieza. Salir con Atrás y abrir inicia una partida nueva; conserva marcadores y ajustes. La partida transitoria se restaura al girar o tras una recreación gestionada por Android.
+## Configuración Firebase pendiente de acceso a la consola
 
-## Abrir y ejecutar
-1. Android Studio > File > Open > carpeta del proyecto.
-2. Instalar SDK Platform 37 si falta y dejar sincronizar Gradle. `local.properties` contiene la ruta local del SDK y no se publica.
-3. Seleccionar un emulador API 24+ y pulsar Run (app).
-4. Usar los botones de rotación del emulador para probar ambas orientaciones.
+Proyecto: reto7jugandotriquionline.
 
-En Windows, con JAVA_HOME apuntando al JBR de Android Studio: `gradlew.bat assembleDebug testDebugUnitTest lintDebug`. APK: `app/build/outputs/apk/debug/app-debug.apk`.
+1. En Firebase, registra una aplicación Android con paquete `com.hernandovela.reto7`.
+2. Descarga google-services.json. Copia `project_info.project_id`, `client[0].client_info.mobilesdk_app_id` y `client[0].api_key[0].current_key` a `app/src/main/assets/firebase.properties`, siguiendo el archivo .example. Esta app inicializa Firebase explícitamente; no necesita el plugin google-services.
+3. Authentication > Métodos de acceso > habilita Anónimo.
+4. Crea Cloud Firestore en modo producción, edición Standard, base (default).
+5. Publica el contenido de `firestore.rules` en la pestaña Reglas. También puedes ejecutar `firebase deploy --only firestore:rules --project reto7jugandotriquionline` con Firebase CLI y tu sesión autorizada.
 
-## Verificación manual
-1. Jugar, girar y comprobar las mismas fichas y el mismo turno.
-2. Girar inmediatamente después de tocar una casilla: Android debe hacer exactamente una respuesta y devolver el turno.
-3. Completar una partida, girar varias veces y comprobar que el marcador no se incrementa de nuevo.
-4. Cambiar dificultad, cerrar con Atrás y reabrir: conserva dificultad y marcadores.
-5. Reiniciar marcadores, cerrar y reabrir: siguen en cero y no cambia la partida actual al reiniciar el marcador.
+No se incluyen credenciales inventadas ni reglas de acceso público. Las reglas validan participantes, dos cupos, turno, una sola casilla vacía modificada y resultado real.
 
-## Referencias y atribución
-Implementación basada en “Challenge: Changing the Orientation and Saving State”, Frank McCown, Harding University, CC BY 3.0: https://creativecommons.org/licenses/by/3.0/ . El tutorial usa Eclipse; este proyecto adapta sus requisitos a Android Studio.
-Documentación: https://developer.android.com/topic/libraries/architecture/views/saving-states-views y https://developer.android.com/reference/android/app/Activity .
+## Android Studio y dos dispositivos
 
-## Evidencias
-Ver [validación y capturas](docs/VALIDACION.md).
+Abre la carpeta del proyecto en Android Studio. Usa el JDK incorporado y el SDK Android 37 instalado. Sincroniza Gradle y ejecuta app en un AVD con Internet. Instala el mismo APK en el teléfono del segundo jugador (Android 7 o posterior).
+
+El APK se genera en `app/build/outputs/apk/debug/app-debug.apk`.
+
+1. Ambos abren la aplicación con Internet.
+2. El primer jugador crea una partida y espera como X.
+3. El segundo ve esa partida en la lista y pulsa Unirse; juega como O.
+4. X comienza. El tablero solo acepta jugadas del jugador al que corresponde el turno.
+5. Victoria, empate o salida se reflejan en ambos dispositivos. Para otra partida, vuelven a la lista y crean una nueva.
+
+El teléfono puede estar en otra red; no se utiliza localhost ni una IP del emulador. Firestore media todas las operaciones. Las transacciones evitan el tercer jugador y movimientos simultáneos. Al perder conexión, el tablero se bloquea hasta recibir datos del servidor. Cerrar la app conserva la partida; Salir la cierra para ambos. Las salas abandonadas al cerrar la app quedan disponibles para reanudar; no hay eliminación automática.
+
+## Validación
+
+`gradlew.bat assembleDebug testDebugUnitTest`
+
+Las pruebas heredadas validan las reglas locales del tablero. La verificación de Firebase con dos dispositivos requiere configurar el proyecto y publicar las reglas; no debe considerarse completada solo porque compila el APK.
+
+Documentación: [transacciones Firestore](https://firebase.google.com/docs/firestore/manage-data/transactions) y [autenticación anónima Android](https://firebase.google.com/docs/auth/android/anonymous-auth).

@@ -1,4 +1,4 @@
-package com.hernandovela.reto6;
+package com.hernandovela.reto7;
 
 import android.app.Activity;
 import android.app.Instrumentation;
