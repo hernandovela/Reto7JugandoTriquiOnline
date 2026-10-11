@@ -1,15 +1,17 @@
 plugins { id("com.android.application") }
 android {
     namespace = "com.hernandovela.reto7"
-    compileSdk = 37
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.hernandovela.reto7"
         minSdk = 24
-        targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 36
+        versionCode = 2
+        versionName = "1.0.1"
         testInstrumentationRunner = "com.hernandovela.reto7.OnlineSmokeInstrumentation"
     }
+    signingConfigs.getByName("debug") { enableV1Signing = true; enableV2Signing = true }
+    buildTypes { create("distribution") { initWith(getByName("release")); signingConfig = signingConfigs.getByName("debug"); isDebuggable = false; isMinifyEnabled = false } }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
