@@ -2,12 +2,12 @@
 
 Extensión del proyecto Reto 6 de Hernando Vela. Android nativo Java, tablero Canvas y recursos gráficos originales. Dos dispositivos conectados al mismo proyecto Firebase juegan por Internet.
 
-## Configuración Firebase pendiente de acceso a la consola
+## Configuración Firebase
 
 Proyecto: reto7jugandotriquionline.
 
 1. En Firebase, registra una aplicación Android con paquete `com.hernandovela.reto7`.
-2. Descarga google-services.json. Copia `project_info.project_id`, `client[0].client_info.mobilesdk_app_id` y `client[0].api_key[0].current_key` a `app/src/main/assets/firebase.properties`, siguiendo el archivo .example. Esta app inicializa Firebase explícitamente; no necesita el plugin google-services.
+2. Descarga google-services.json y guárdalo en `app/google-services.json`. Gradle lo incluye automáticamente en los assets y la app selecciona el cliente cuyo paquete es `com.hernandovela.reto7`. También admite `app/src/main/assets/firebase.properties` como alternativa. Esta app inicializa Firebase explícitamente; no necesita el plugin google-services.
 3. Authentication > Métodos de acceso > habilita Anónimo.
 4. Crea Cloud Firestore en modo producción, edición Standard, base (default).
 5. Publica el contenido de `firestore.rules` en la pestaña Reglas. También puedes ejecutar `firebase deploy --only firestore:rules --project reto7jugandotriquionline` con Firebase CLI y tu sesión autorizada.
@@ -33,5 +33,9 @@ El teléfono puede estar en otra red; no se utiliza localhost ni una IP del emul
 `gradlew.bat assembleDebug testDebugUnitTest`
 
 Las pruebas heredadas validan las reglas locales del tablero. La verificación de Firebase con dos dispositivos requiere configurar el proyecto y publicar las reglas; no debe considerarse completada solo porque compila el APK.
+
+Con google-services.json, Authentication anónimo y las reglas publicadas, ejecuta `node scripts/verify-cloud.mjs`. Verifica tres identidades independientes, competencia por el segundo cupo, rechazo de un tercer jugador, turno incorrecto, sobrescritura de casilla, cambio de participante, victoria y lectura desde el otro cliente. Crea una partida de verificación identificada por su nombre; queda finalizada o cerrada en la base.
+
+`gradlew.bat connectedDebugAndroidTest` ejecuta la prueba Android contra Firebase: inicio anónimo, creación y lectura del servidor, recreación de Activity y cierre de una sala de prueba. Requiere un emulador o dispositivo conectado y Firebase configurado. La prueba antigua de sonidos del modo contra la computadora fue reemplazada porque sus controles no existen en la modalidad online.
 
 Documentación: [transacciones Firestore](https://firebase.google.com/docs/firestore/manage-data/transactions) y [autenticación anónima Android](https://firebase.google.com/docs/auth/android/anonymous-auth).

@@ -25,7 +25,7 @@ final class OnlineRepository {
     if(Arrays.asList("waiting","playing").contains(phase))t.update(ref,"status","closed");
    }else{
     if(mark.isEmpty()||!"playing".equals(phase)||!mark.equals(g.getString("turn")))throw new IllegalStateException("Espera tu turno.");
-    TicTacToeGame b=new TicTacToeGame();b.restore(String.join("",(List<String>)g.get("board")));
+    TicTacToeGame b=new TicTacToeGame();b.restore(android.text.TextUtils.join("",(List<String>)g.get("board")));
     if(!b.setMove(mark.charAt(0),cell))throw new IllegalStateException("Casilla no disponible.");
     int result=b.result();t.update(ref,"board",Arrays.asList(b.save().split("")),"turn",mark.equals("X")?"O":"X","status",result==0?"playing":result==1?"X":result==2?"O":"draw");
    }

@@ -16,9 +16,7 @@ public final class MainActivity extends Activity {
   shell("Conectando con Firebase…");
   try{
    if(FirebaseApp.getApps(this).isEmpty()){
-    java.util.Properties p=new java.util.Properties();
-    try(java.io.InputStream in=getAssets().open("firebase.properties")){p.load(in);}
-    FirebaseApp.initializeApp(this,new FirebaseOptions.Builder().setProjectId(p.getProperty("projectId")).setApplicationId(p.getProperty("applicationId")).setApiKey(p.getProperty("apiKey")).build());
+    FirebaseApp.initializeApp(this,FirebaseConfig.load(this));
    }
    repo=new OnlineRepository();
    FirebaseAuth a=FirebaseAuth.getInstance();
@@ -63,7 +61,7 @@ public final class MainActivity extends Activity {
   if(!current.exists()){status.setText("La partida no existe.");board.setEnabled(false);button("Volver a la lista",()->{gameId=null;getPreferences(0).edit().remove("gameId").apply();lobby();});return;}
   String mark=repo.uid().equals(current.getString("host"))?"X":repo.uid().equals(current.getString("guest"))?"O":"";
   String phase=current.getString("status"),turn=current.getString("turn");
-  game.restore(String.join("",(java.util.List<String>)current.get("board")));board.invalidate();
+  game.restore(android.text.TextUtils.join("",(java.util.List<String>)current.get("board")));board.invalidate();
   String s="waiting".equals(phase)?"Eres X · Esperando al segundo jugador…":"playing".equals(phase)?"Eres "+mark+" · "+(mark.equals(turn)?"Tu turno":"Turno del rival"):"draw".equals(phase)?"¡Empate!":"closed".equals(phase)?"Partida cerrada":mark.equals(phase)?"¡Ganaste!":"Ganó "+phase;
   status.setText(connected?s:"Sin conexión · Reconectando…");board.setEnabled(connected&&!busy&&!mark.isEmpty()&&"playing".equals(phase)&&mark.equals(turn));
  }
