@@ -27,6 +27,7 @@ const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const id=Array.from(crypto.randomBytes(8),b=>alphabet[b%alphabet.length]).join('');
 const path='projects/'+project+'/databases/(default)/documents/games_v2/'+id;
 async function commit(who,data,mask,precondition,created=false,expected=200){
+ if(mask?.includes('board') && !mask.includes('round') && expected===200){data={...data,hostWins:data.status==='X'?1:0,guestWins:data.status==='O'?1:0};mask=[...mask,'hostWins','guestWins'];}
  const write={update:{name:path,fields:fields(data)}};
  if(mask)write.updateMask={fieldPaths:mask};
  if(precondition)write.currentDocument=precondition;
@@ -62,8 +63,9 @@ try{
  for(const [who,cell,mark,next,status] of [[opponent,3,'O','X','playing'],[host,1,'X','O','playing'],[opponent,4,'O','X','playing'],[host,2,'X','O','X']]){
   board[cell]=mark;await commit(who,{board,turn:next,status},['board','turn','status']);
  }
- doc=await read(opponent);assert.equal(doc.fields.status.stringValue,'X'); assert.equal(doc.fields.hostName.stringValue,'Ana'); assert.equal(doc.fields.guestName.stringValue,'Luis'); assert.equal(doc.fields.code.stringValue,id);
+ doc=await read(opponent);assert.equal(doc.fields.hostWins.integerValue,'1');assert.equal(doc.fields.guestWins.integerValue,'0');assert.equal(doc.fields.status.stringValue,'X'); assert.equal(doc.fields.hostName.stringValue,'Ana'); assert.equal(doc.fields.guestName.stringValue,'Luis'); assert.equal(doc.fields.code.stringValue,id);
  await commit(opponent,{hostName:'Cambio no autorizado'},['hostName'],null,false,403);
+ await commit(host,{hostWins:99},['hostWins'],null,false,403);
  await commit(host,{code:'ABCD2345'},['code'],null,false,403);
  assert.deepEqual(doc.fields.board.arrayValue.values.map(v=>v.stringValue),board);
  board[8]='O';await commit(opponent,{board,turn:'X',status:'X'},['board','turn','status'],null,false,403);
@@ -73,12 +75,12 @@ try{
  doc=await read(opponent);assert.equal(doc.fields.status.stringValue,'X');assert.equal(doc.fields.hostAgain.booleanValue,true);
  await commit(host,{round:1,hostAgain:true,guestAgain:true},['round','hostAgain','guestAgain'],null,false,403);
  await commit(opponent,{board:Array(9).fill(' '),turn:'X',status:'playing',round:2,hostAgain:false,guestAgain:false},['board','turn','status','round','hostAgain','guestAgain']);
- doc=await read(host);assert.equal(doc.fields.round.integerValue,'2');assert.equal(doc.fields.code.stringValue,id);assert.equal(doc.fields.hostName.stringValue,'Ana');
+ doc=await read(host);assert.equal(doc.fields.hostWins.integerValue,'1');assert.equal(doc.fields.guestWins.integerValue,'0');assert.equal(doc.fields.round.integerValue,'2');assert.equal(doc.fields.code.stringValue,id);assert.equal(doc.fields.hostName.stringValue,'Ana');
  assert.deepEqual(doc.fields.board.arrayValue.values.map(v=>v.stringValue),Array(9).fill(' '));
  await commit(host,{round:2,hostAgain:true,guestAgain:false},['round','hostAgain','guestAgain'],null,false,403);
  await commit(host,{status:'closed'},['status']);
  await commit(opponent,{board:Array(9).fill(' '),turn:'X',status:'playing',round:3,hostAgain:false,guestAgain:false},['board','turn','status','round','hostAgain','guestAgain'],null,false,403);
- console.log('PASS 1.2.0: códigos, nombres, turnos, victoria, consentimiento de ambos para revancha, mismo código, ronda siguiente y cierre definitivo.');
+ console.log('PASS 1.3.0: marcador sin duplicados ni manipulación, códigos, nombres, turnos, victoria, consentimiento de ambos para revancha, mismo código, ronda siguiente y cierre definitivo.');
 }finally{
  if(created){
   const doc=await read(host);

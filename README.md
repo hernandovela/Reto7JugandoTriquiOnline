@@ -1,10 +1,10 @@
-# Reto 7 · Jugando Triqui Online · 1.2.0
+# Reto 7 · Jugando Triqui Online · 1.3.0
 
 Android nativo Java, basado en el Reto 6 de Hernando Vela. Usa Authentication anónimo y Cloud Firestore (default) del proyecto reto7jugandotriquionline.
 
 ## Instalar y jugar
 
-Ambos jugadores deben instalar TriquiOnline-Reto7-1.2.0.apk. Usa WhatsApp > Adjuntar > Documento para enviarlo. El destinatario descarga el archivo y lo abre desde Mis archivos > Descargas. Esta versión mantiene paquete y firma de 1.0.1 para actualizarla sin desinstalar.
+Ambos jugadores deben instalar TriquiOnline-Reto7-1.3.0.apk. Usa WhatsApp > Adjuntar > Documento para enviarlo. El destinatario descarga el archivo y lo abre desde Mis archivos > Descargas. Esta versión mantiene paquete y firma de 1.0.1 para actualizarla sin desinstalar.
 
 1. Escribe tu nombre (1 a 24 caracteres).
 2. Crea una partida. Se genera un código como ABCD-2345.
@@ -42,3 +42,7 @@ Las reglas mantienen games para los APK 1.0.x. Ambas personas deben actualizar a
 Las pruebas crean salas identificadas como verificación y las finalizan o cierran. Las cuentas anónimas de prueba permanecen en Firebase.
 
 La versión 1.2.0 muestra el resultado y reproduce el sonido una vez por ronda y jugador; Ver resultado / seguir jugando permite volver a abrir el popup sin repetir el sonido. Ambas personas deben actualizar a 1.2.0 para aceptar revanchas. Las salas 1.1 existentes admiten la nueva función con ronda inicial 1.
+
+## Marcador y sonidos · 1.3.0
+Ganadas y perdidas se muestran debajo del nombre de cada jugador. El marcador es por partida/código, se guarda en Firebase y continúa en las revanchas. Cada victoria incrementa una sola vez al ganador y equivale a una pérdida del rival. Los empates no cuentan como derrota. Las rondas anteriores a 1.3 no almacenaban ganadores históricos y no se reconstruyen: el contador comienza en cero cuando faltan campos.
+Cada X confirmada reproduce human_move.wav y cada O confirmada reproduce computer_move.wav en los clientes conectados. El sonido no se repite por snapshots duplicados, carga inicial, giro o reinicio del tablero. Los sonidos de resultado de 1.2 permanecen. Ambos jugadores deben actualizar a 1.3.0; las nuevas reglas requieren actualizar el marcador junto con la jugada.

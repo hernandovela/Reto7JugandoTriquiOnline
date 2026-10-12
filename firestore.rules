@@ -62,10 +62,12 @@ service cloud.firestore {
     let r=resource.data;let n=request.resource.data;let m=r.turn;
     return member() && r.status=='playing' &&
      request.auth.uid==(m=='X'?r.host:r.guest) &&
-     n.diff(r).affectedKeys().hasOnly(['board','turn','status']) &&
+     n.diff(r).affectedKeys().hasOnly(['board','turn','status','hostWins','guestWins']) &&
      n.board is list && n.board.size()==9 && n.board.hasOnly([' ','X','O']) &&
      (cell(0,m)||cell(1,m)||cell(2,m)||cell(3,m)||cell(4,m)||cell(5,m)||cell(6,m)||cell(7,m)||cell(8,m)) &&
-     n.turn==(m=='X'?'O':'X') && n.status==outcome(n.board,m);
+     n.turn==(m=='X'?'O':'X') && n.status==outcome(n.board,m) &&
+     n.hostWins is int && n.guestWins is int &&
+     n.hostWins==r.get('hostWins',0)+(n.status=='X'?1:0) && n.guestWins==r.get('guestWins',0)+(n.status=='O'?1:0);
    }
    function finished(){return resource.data.status in ['X','O','draw'];}
    function vote(){
@@ -86,8 +88,8 @@ service cloud.firestore {
    }
    allow read: if signed();
    allow create: if signed() &&
-    request.resource.data.keys().hasOnly(['host','guest','name','board','turn','status','createdAt','hostName','guestName','code','round','hostAgain','guestAgain']) &&
-    request.resource.data.get('round',1)==1 && request.resource.data.get('hostAgain',false)==false && request.resource.data.get('guestAgain',false)==false &&
+    request.resource.data.keys().hasOnly(['host','guest','name','board','turn','status','createdAt','hostName','guestName','code','round','hostAgain','guestAgain','hostWins','guestWins']) &&
+    request.resource.data.get('hostWins',0)==0 && request.resource.data.get('guestWins',0)==0 && request.resource.data.get('round',1)==1 && request.resource.data.get('hostAgain',false)==false && request.resource.data.get('guestAgain',false)==false &&
     id.matches('[A-HJ-NP-Z2-9]{8}') && request.resource.data.code==id &&
     request.resource.data.hostName is string && request.resource.data.hostName.size()>0 && request.resource.data.hostName.size()<=24 && request.resource.data.guestName=='' &&
     request.resource.data.host==request.auth.uid && request.resource.data.guest=='' &&

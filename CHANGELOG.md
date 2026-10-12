@@ -1,5 +1,15 @@
 # Historial de versiones
 
+## 1.3.0 · build 5 · 12 de octubre de 2026
+
+- Ganadas y perdidas debajo del nombre de X y O, en líneas separadas.
+- Victorias guardadas en Firebase mediante la misma transacción que termina la ronda; pérdidas derivadas de las victorias del rival.
+- Marcador conservado en revanchas y reconexiones; las reglas rechazan incrementos arbitrarios.
+- Sonidos diferentes para X y O confirmadas, locales y del rival. Snapshots repetidos, carga inicial y tableros reiniciados son silenciosos.
+- Sonidos de victoria y derrota permanecen; la reproducción de jugadas usa un MediaPlayer separado.
+- Para partidas anteriores sin marcador, se parte de cero; no se inventan resultados históricos.
+- Ambos dispositivos deben actualizar a 1.3.0.
+
 ## 1.2.0 · build 4 · 12 de octubre de 2026
 
 - Popup personalizado de victoria, derrota o empate para cada jugador.

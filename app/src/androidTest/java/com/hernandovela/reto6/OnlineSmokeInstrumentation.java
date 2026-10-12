@@ -33,11 +33,13 @@ public final class OnlineSmokeInstrumentation extends Instrumentation {
    runOnMainSync(()->{
     if(first.current==null||!first.connected)throw new AssertionError("No llegó el estado online");
     if(!first.hostLabel.getText().toString().contains("Ana")||!first.guestLabel.getText().toString().contains("Luis"))throw new AssertionError("Nombres no visibles");
-    first.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+
    });
    waitForIdleSync();
    Tasks.await(host.change(room,0),30,TimeUnit.SECONDS);
+   assertMove(first,R.raw.human_move);
    Tasks.await(guest.change(room,4),30,TimeUnit.SECONDS);
+   assertMove(first,R.raw.computer_move);
    DocumentSnapshot remote=Tasks.await(guest.games().document(room).get(Source.SERVER),30,TimeUnit.SECONDS);
    java.util.List<?> board=(java.util.List<?>)remote.get("board");
    if(!"X".equals(board.get(0))||!"O".equals(board.get(4)))throw new AssertionError("Jugadas no sincronizadas");
@@ -45,8 +47,6 @@ public final class OnlineSmokeInstrumentation extends Instrumentation {
    Tasks.await(host.change(room,1),30,TimeUnit.SECONDS);
    Tasks.await(guest.change(room,3),30,TimeUnit.SECONDS);
    Tasks.await(host.change(room,2),30,TimeUnit.SECONDS);
-   prefs.edit().putString("gameV2Id",room).commit();
-   activity=(MainActivity)startActivitySync(new Intent(c,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
    assertOutcome(activity,"Ganaste",R.raw.victory);
    Tasks.await(host.again(room,1),30,TimeUnit.SECONDS);
    DocumentSnapshot waiting=Tasks.await(ref.get(Source.SERVER),30,TimeUnit.SECONDS);
@@ -61,9 +61,12 @@ public final class OnlineSmokeInstrumentation extends Instrumentation {
    Tasks.await(host.change(room,1),30,TimeUnit.SECONDS);Tasks.await(guest.change(room,4),30,TimeUnit.SECONDS);
    Tasks.await(host.change(room,8),30,TimeUnit.SECONDS);Tasks.await(guest.change(room,5),30,TimeUnit.SECONDS);
    assertOutcome(activity,"Perdiste",R.raw.defeat);
+   DocumentSnapshot scores=Tasks.await(guest.games().document(room).get(Source.SERVER),30,TimeUnit.SECONDS);
+   if(OnlineRepository.wins(scores,"hostWins")!=1||OnlineRepository.wins(scores,"guestWins")!=1)throw new AssertionError("Marcador incorrecto");
+   final MainActivity scored=activity;runOnMainSync(()->{if(!scored.hostLabel.getText().toString().contains("Ganadas: 1\nPerdidas: 1")||!scored.guestLabel.getText().toString().contains("Ganadas: 1\nPerdidas: 1"))throw new AssertionError("Marcador no visible");});
    if(!RoomCode.normalize(room).equals(next.getString("code")))throw new AssertionError("Cambió código");
    Tasks.await(host.change(room,-2),30,TimeUnit.SECONDS);room=null;
-   result.putString("stream","OK 1.2.0: popup ganador/victory WAV, popup perdedor/defeat WAV y revancha con ambos votos en el mismo código.\n");
+   result.putString("stream","OK 1.3.0: sonido X y O confirmado, marcador 1-1 visible, popup ganador/victory WAV, popup perdedor/defeat WAV y revancha con ambos votos en el mismo código.\n");
    exitCode=Activity.RESULT_OK;
   }catch(Throwable error){
    if(room!=null&&host!=null)try{Tasks.await(host.change(room,-2),10,TimeUnit.SECONDS);}catch(Exception ignored){}
@@ -75,6 +78,11 @@ public final class OnlineSmokeInstrumentation extends Instrumentation {
    if(previousName==null)edit.remove("playerName");else edit.putString("playerName",previousName);edit.commit();
   }
   finish(exitCode,result);
+ }
+ private void assertMove(MainActivity activity,int resource)throws Exception{
+  long deadline=System.currentTimeMillis()+15000;
+  while(activity.moveFeedback.lastSoundResource!=resource&&System.currentTimeMillis()<deadline)Thread.sleep(100);
+  if(activity.moveFeedback.lastSoundResource!=resource)throw new AssertionError("Falta sonido de jugada "+resource);
  }
  private void assertOutcome(MainActivity activity,String title,int sound)throws Exception{
   long deadline=System.currentTimeMillis()+15000;

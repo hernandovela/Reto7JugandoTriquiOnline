@@ -15,6 +15,7 @@ public final class MainActivity extends Activity {
  LinearLayout content,rooms;TextView status,detail,hostLabel,guestLabel,roomTitle;
  BoardView board;EditText playerInput;Button resultButton;AlertDialog resultDialog;
  final OutcomeFeedback feedback=new OutcomeFeedback();
+ final OutcomeFeedback moveFeedback=new OutcomeFeedback();
  String gameId;boolean busy,connected;DocumentSnapshot current;
  final TicTacToeGame game=new TicTacToeGame();
  static final int PLAYER_INPUT=4101,ROOM_INPUT=4102,CODE_INPUT=4103;
@@ -153,9 +154,18 @@ public final class MainActivity extends Activity {
   String host=current.getString("hostName"),guest=current.getString("guestName");
   String mark=repo.uid().equals(current.getString("host"))?"X":repo.uid().equals(current.getString("guest"))?"O":"";
   String phase=current.getString("status"),turn=current.getString("turn");
-  hostLabel.setText("X · "+host);guestLabel.setText("O · "+(guest==null||guest.isEmpty()?"Esperando":guest));
+  long hostWins=OnlineRepository.wins(current,"hostWins"),guestWins=OnlineRepository.wins(current,"guestWins");
+  hostLabel.setText("X · "+host+"\nGanadas: "+hostWins+"\nPerdidas: "+guestWins);
+  guestLabel.setText("O · "+(guest==null||guest.isEmpty()?"Esperando":guest)+"\nGanadas: "+guestWins+"\nPerdidas: "+hostWins);
   roomTitle.setText(current.getString("name")+" · Ronda "+OnlineRepository.round(current));
   game.restore(android.text.TextUtils.join("",(java.util.List<String>)current.get("board")));board.invalidate();
+  if(connected&&!current.getMetadata().hasPendingWrites()){
+   String moveKey="moveBoard:"+gameId+":"+OnlineRepository.round(current);
+   String previous=getPreferences(0).getString(moveKey,null),now=game.save();
+   char added=MoveFeedback.added(previous,now);
+   getPreferences(0).edit().putString(moveKey,now).apply();
+   if(added=='X'||added=='O')moveFeedback.play(this,added=='X'?R.raw.human_move:R.raw.computer_move);
+  }
   String playerTurn="X".equals(turn)?host:guest;
   String s="waiting".equals(phase)?"Esperando al segundo jugador…":"playing".equals(phase)?(mark.equals(turn)?"¡Tu turno, "+playerTurn+"!":"Turno de "+playerTurn):"draw".equals(phase)?"¡Empate!":"closed".equals(phase)?"Partida cerrada":"Ganó "+("X".equals(phase)?host:guest);
   status.setText(!connected?"Sin conexión · Reconectando…":busy?"Enviando…":s);
@@ -220,6 +230,6 @@ public final class MainActivity extends Activity {
   if(gameId!=null)new AlertDialog.Builder(this).setMessage("¿Cerrar la app? Puedes reanudar esta partida al abrirla.").setPositiveButton("Cerrar",(d,w)->finish()).setNegativeButton("Continuar",null).show();
   else super.onBackPressed();
  }
- @Override protected void onStop(){feedback.release();super.onStop();}
- @Override protected void onDestroy(){if(listener!=null)listener.remove();if(resultDialog!=null)resultDialog.dismiss();feedback.release();super.onDestroy();}
+ @Override protected void onStop(){feedback.release();moveFeedback.release();super.onStop();}
+ @Override protected void onDestroy(){if(listener!=null)listener.remove();if(resultDialog!=null)resultDialog.dismiss();feedback.release();moveFeedback.release();super.onDestroy();}
 }

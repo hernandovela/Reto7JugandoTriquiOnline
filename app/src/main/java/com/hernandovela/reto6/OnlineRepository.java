@@ -19,7 +19,7 @@ final class OnlineRepository {
    g.put("host",uid());g.put("guest","");g.put("hostName",hostName);g.put("guestName","");
    g.put("name",name);g.put("code",code);
    g.put("board",Arrays.asList(" "," "," "," "," "," "," "," "," "));
-   g.put("turn","X");g.put("status","waiting");g.put("round",1L);g.put("hostAgain",false);g.put("guestAgain",false);g.put("createdAt",FieldValue.serverTimestamp());
+   g.put("turn","X");g.put("status","waiting");g.put("round",1L);g.put("hostAgain",false);g.put("guestAgain",false);g.put("hostWins",0L);g.put("guestWins",0L);g.put("createdAt",FieldValue.serverTimestamp());
    t.set(ref,g);return ref;
   });
  }
@@ -50,7 +50,8 @@ final class OnlineRepository {
     if(mark.isEmpty()||!"playing".equals(phase)||!mark.equals(g.getString("turn")))throw new IllegalStateException("Espera tu turno.");
     TicTacToeGame b=new TicTacToeGame();b.restore(android.text.TextUtils.join("",(List<String>)g.get("board")));
     if(!b.setMove(mark.charAt(0),cell))throw new IllegalStateException("Casilla no disponible.");
-    int result=b.result();t.update(ref,"board",Arrays.asList(b.save().split("")),"turn",mark.equals("X")?"O":"X","status",result==0?"playing":result==1?"X":result==2?"O":"draw");
+    int result=b.result();t.update(ref,"board",Arrays.asList(b.save().split("")),"turn",mark.equals("X")?"O":"X","status",result==0?"playing":result==1?"X":result==2?"O":"draw",
+     "hostWins",wins(g,"hostWins")+(result==1?1:0),"guestWins",wins(g,"guestWins")+(result==2?1:0));
    }return null;
   });
  }
@@ -73,4 +74,5 @@ final class OnlineRepository {
   });
  }
  static long round(DocumentSnapshot g){Long round=g.getLong("round");return round==null?1:round;}
+ static long wins(DocumentSnapshot g,String key){Long count=g.getLong(key);return count==null?0:count;}
 }
