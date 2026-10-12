@@ -19,7 +19,7 @@ final class OnlineRepository {
    g.put("host",uid());g.put("guest","");g.put("hostName",hostName);g.put("guestName","");
    g.put("name",name);g.put("code",code);
    g.put("board",Arrays.asList(" "," "," "," "," "," "," "," "," "));
-   g.put("turn","X");g.put("status","waiting");g.put("createdAt",FieldValue.serverTimestamp());
+   g.put("turn","X");g.put("status","waiting");g.put("round",1L);g.put("hostAgain",false);g.put("guestAgain",false);g.put("createdAt",FieldValue.serverTimestamp());
    t.set(ref,g);return ref;
   });
  }
@@ -45,7 +45,7 @@ final class OnlineRepository {
    String mark=uid().equals(g.getString("host"))?"X":uid().equals(g.getString("guest"))?"O":"";
    if(cell==-2){
     if(mark.isEmpty())throw new IllegalStateException("No perteneces a esta partida.");
-    if(Arrays.asList("waiting","playing").contains(phase))t.update(ref,"status","closed");
+    if(!"closed".equals(phase))t.update(ref,"status","closed");
    }else{
     if(mark.isEmpty()||!"playing".equals(phase)||!mark.equals(g.getString("turn")))throw new IllegalStateException("Espera tu turno.");
     TicTacToeGame b=new TicTacToeGame();b.restore(android.text.TextUtils.join("",(List<String>)g.get("board")));
@@ -54,4 +54,23 @@ final class OnlineRepository {
    }return null;
   });
  }
+ Task<Void> again(String id,long expectedRound){
+  DocumentReference ref=games().document(id);
+  return db.runTransaction(t->{
+   DocumentSnapshot g=t.get(ref);
+   boolean host=uid().equals(g.getString("host")),guest=uid().equals(g.getString("guest"));
+   if(!g.exists()||(!host&&!guest))throw new IllegalStateException("No perteneces a esta partida.");
+   long round=round(g);
+   if(round!=expectedRound)throw new IllegalStateException("Ya comenzó otra ronda.");
+   if(!Arrays.asList("X","O","draw").contains(g.getString("status")))throw new IllegalStateException("La ronda no ha terminado o la partida está cerrada.");
+   boolean hostAgain=Boolean.TRUE.equals(g.getBoolean("hostAgain")),guestAgain=Boolean.TRUE.equals(g.getBoolean("guestAgain"));
+   if((host&&hostAgain)||(guest&&guestAgain))return null;
+   hostAgain=hostAgain||host;guestAgain=guestAgain||guest;
+   if(hostAgain&&guestAgain){
+    t.update(ref,"board",Arrays.asList(" "," "," "," "," "," "," "," "," "),"turn","X","status","playing","round",round+1,"hostAgain",false,"guestAgain",false);
+   }else t.update(ref,"round",round,"hostAgain",hostAgain,"guestAgain",guestAgain);
+   return null;
+  });
+ }
+ static long round(DocumentSnapshot g){Long round=g.getLong("round");return round==null?1:round;}
 }

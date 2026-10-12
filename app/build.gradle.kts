@@ -6,8 +6,8 @@ android {
         applicationId = "com.hernandovela.reto7"
         minSdk = 24
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.1.0"
+        versionCode = 4
+        versionName = "1.2.0"
         testInstrumentationRunner = "com.hernandovela.reto7.OnlineSmokeInstrumentation"
     }
     signingConfigs.getByName("debug") { enableV1Signing = true; enableV2Signing = true }

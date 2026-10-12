@@ -1,10 +1,10 @@
-# Reto 7 · Jugando Triqui Online · 1.1.0
+# Reto 7 · Jugando Triqui Online · 1.2.0
 
 Android nativo Java, basado en el Reto 6 de Hernando Vela. Usa Authentication anónimo y Cloud Firestore (default) del proyecto reto7jugandotriquionline.
 
 ## Instalar y jugar
 
-Ambos jugadores deben instalar TriquiOnline-Reto7-1.1.0.apk. Usa WhatsApp > Adjuntar > Documento para enviarlo. El destinatario descarga el archivo y lo abre desde Mis archivos > Descargas. Esta versión mantiene paquete y firma de 1.0.1 para actualizarla sin desinstalar.
+Ambos jugadores deben instalar TriquiOnline-Reto7-1.2.0.apk. Usa WhatsApp > Adjuntar > Documento para enviarlo. El destinatario descarga el archivo y lo abre desde Mis archivos > Descargas. Esta versión mantiene paquete y firma de 1.0.1 para actualizarla sin desinstalar.
 
 1. Escribe tu nombre (1 a 24 caracteres).
 2. Crea una partida. Se genera un código como ABCD-2345.
@@ -14,7 +14,7 @@ Ambos jugadores deben instalar TriquiOnline-Reto7-1.1.0.apk. Usa WhatsApp > Adju
 
 Cualquiera puede crear partidas y copiar el código. La lista muestra salas esperando, pero para ingresar a la partida de otra persona hay que escribir el código. Puedes reanudar tus salas desde la lista. Los códigos no constituyen una contraseña privada: las salas siguen siendo listables para usuarios autenticados.
 
-La app guarda el nombre y la partida actual al cerrar o girar. Salir cierra la partida para ambos. Para jugar otra ronda, vuelve a la lista y crea una partida con nuevo código. Los dispositivos solo necesitan Internet, pueden estar en redes distintas.
+La app guarda el nombre y la partida actual al cerrar o girar. Salir cierra la partida para ambos. Al terminar, cada jugador ve su popup de victoria, derrota o empate. Ganador y perdedor oyen sonidos distintos. Pulsa Seguir jugando: la revancha comienza cuando ambos aceptan, conserva el código y muestra la nueva ronda. Salir cierra la sala para ambos. Los dispositivos solo necesitan Internet, pueden estar en redes distintas.
 
 ## Android Studio
 
@@ -40,3 +40,5 @@ Las reglas mantienen games para los APK 1.0.x. Ambas personas deben actualizar a
 - Prueba Android OnlineSmokeInstrumentation: dos usuarios, entrada con código formateado, nombres en pantalla, giro y jugadas sincronizadas.
 
 Las pruebas crean salas identificadas como verificación y las finalizan o cierran. Las cuentas anónimas de prueba permanecen en Firebase.
+
+La versión 1.2.0 muestra el resultado y reproduce el sonido una vez por ronda y jugador; Ver resultado / seguir jugando permite volver a abrir el popup sin repetir el sonido. Ambas personas deben actualizar a 1.2.0 para aceptar revanchas. Las salas 1.1 existentes admiten la nueva función con ronda inicial 1.

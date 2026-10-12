@@ -17,6 +17,8 @@ async function account(){
 }
 function value(v){
  if(Array.isArray(v))return {arrayValue:{values:v.map(value)}};
+ if(typeof v==='boolean')return {booleanValue:v};
+ if(typeof v==='number')return {integerValue:String(v)};
  return {stringValue:v};
 }
 function fields(data){return Object.fromEntries(Object.entries(data).map(([k,v])=>[k,value(v)]));}
@@ -65,7 +67,18 @@ try{
  await commit(host,{code:'ABCD2345'},['code'],null,false,403);
  assert.deepEqual(doc.fields.board.arrayValue.values.map(v=>v.stringValue),board);
  board[8]='O';await commit(opponent,{board,turn:'X',status:'X'},['board','turn','status'],null,false,403);
- console.log('PASS: tres identidades, unión concurrente, cupo máximo, turnos, casillas ocupadas, participantes, victoria y lectura desde otro cliente.');
+ await commit(outsider,{round:1,hostAgain:true,guestAgain:false},['round','hostAgain','guestAgain'],null,false,403);
+ await commit(host,{board:Array(9).fill(' '),turn:'X',status:'playing',round:2,hostAgain:false,guestAgain:false},['board','turn','status','round','hostAgain','guestAgain'],null,false,403);
+ await commit(host,{round:1,hostAgain:true,guestAgain:false},['round','hostAgain','guestAgain']);
+ doc=await read(opponent);assert.equal(doc.fields.status.stringValue,'X');assert.equal(doc.fields.hostAgain.booleanValue,true);
+ await commit(host,{round:1,hostAgain:true,guestAgain:true},['round','hostAgain','guestAgain'],null,false,403);
+ await commit(opponent,{board:Array(9).fill(' '),turn:'X',status:'playing',round:2,hostAgain:false,guestAgain:false},['board','turn','status','round','hostAgain','guestAgain']);
+ doc=await read(host);assert.equal(doc.fields.round.integerValue,'2');assert.equal(doc.fields.code.stringValue,id);assert.equal(doc.fields.hostName.stringValue,'Ana');
+ assert.deepEqual(doc.fields.board.arrayValue.values.map(v=>v.stringValue),Array(9).fill(' '));
+ await commit(host,{round:2,hostAgain:true,guestAgain:false},['round','hostAgain','guestAgain'],null,false,403);
+ await commit(host,{status:'closed'},['status']);
+ await commit(opponent,{board:Array(9).fill(' '),turn:'X',status:'playing',round:3,hostAgain:false,guestAgain:false},['board','turn','status','round','hostAgain','guestAgain'],null,false,403);
+ console.log('PASS 1.2.0: códigos, nombres, turnos, victoria, consentimiento de ambos para revancha, mismo código, ronda siguiente y cierre definitivo.');
 }finally{
  if(created){
   const doc=await read(host);

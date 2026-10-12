@@ -67,9 +67,27 @@ service cloud.firestore {
      (cell(0,m)||cell(1,m)||cell(2,m)||cell(3,m)||cell(4,m)||cell(5,m)||cell(6,m)||cell(7,m)||cell(8,m)) &&
      n.turn==(m=='X'?'O':'X') && n.status==outcome(n.board,m);
    }
+   function finished(){return resource.data.status in ['X','O','draw'];}
+   function vote(){
+    let r=resource.data;let n=request.resource.data;
+    return member() && finished() && n.diff(r).affectedKeys().hasOnly(['round','hostAgain','guestAgain']) &&
+     n.round==r.get('round',1) && n.hostAgain is bool && n.guestAgain is bool && !(n.hostAgain && n.guestAgain) &&
+     ((request.auth.uid==r.host && !r.get('hostAgain',false) && n.hostAgain==true && n.guestAgain==r.get('guestAgain',false)) ||
+      (request.auth.uid==r.guest && !r.get('guestAgain',false) && n.guestAgain==true && n.hostAgain==r.get('hostAgain',false)));
+   }
+   function rematch(){
+    let r=resource.data;let n=request.resource.data;
+    return member() && finished() &&
+     ((request.auth.uid==r.host && r.get('guestAgain',false)==true && !r.get('hostAgain',false)) ||
+      (request.auth.uid==r.guest && r.get('hostAgain',false)==true && !r.get('guestAgain',false))) &&
+     n.diff(r).affectedKeys().hasOnly(['board','turn','status','round','hostAgain','guestAgain']) &&
+     n.round==r.get('round',1)+1 && n.hostAgain==false && n.guestAgain==false &&
+     n.board==[' ',' ',' ',' ',' ',' ',' ',' ',' '] && n.turn=='X' && n.status=='playing';
+   }
    allow read: if signed();
    allow create: if signed() &&
-    request.resource.data.keys().hasOnly(['host','guest','name','board','turn','status','createdAt','hostName','guestName','code']) &&
+    request.resource.data.keys().hasOnly(['host','guest','name','board','turn','status','createdAt','hostName','guestName','code','round','hostAgain','guestAgain']) &&
+    request.resource.data.get('round',1)==1 && request.resource.data.get('hostAgain',false)==false && request.resource.data.get('guestAgain',false)==false &&
     id.matches('[A-HJ-NP-Z2-9]{8}') && request.resource.data.code==id &&
     request.resource.data.hostName is string && request.resource.data.hostName.size()>0 && request.resource.data.hostName.size()<=24 && request.resource.data.guestName=='' &&
     request.resource.data.host==request.auth.uid && request.resource.data.guest=='' &&
@@ -82,8 +100,8 @@ service cloud.firestore {
      request.resource.data.guestName is string && request.resource.data.guestName.size()>0 && request.resource.data.guestName.size()<=24 &&
      request.resource.data.status=='playing' &&
      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['guest','guestName','status'])) ||
-    (member() && resource.data.status in ['waiting','playing'] && request.resource.data.status=='closed' &&
-     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])) || move());
+    (member() && resource.data.status in ['waiting','playing','X','O','draw'] && request.resource.data.status=='closed' &&
+     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])) || move() || vote() || rematch());
    allow delete: if false;
   }
  }

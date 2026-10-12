@@ -13,7 +13,8 @@ import com.google.firebase.firestore.*;
 public final class MainActivity extends Activity {
  OnlineRepository repo; ListenerRegistration listener;
  LinearLayout content,rooms;TextView status,detail,hostLabel,guestLabel,roomTitle;
- BoardView board;EditText playerInput;
+ BoardView board;EditText playerInput;Button resultButton;AlertDialog resultDialog;
+ final OutcomeFeedback feedback=new OutcomeFeedback();
  String gameId;boolean busy,connected;DocumentSnapshot current;
  final TicTacToeGame game=new TicTacToeGame();
  static final int PLAYER_INPUT=4101,ROOM_INPUT=4102,CODE_INPUT=4103;
@@ -33,7 +34,8 @@ public final class MainActivity extends Activity {
  }
  void shell(String title){
   if(listener!=null){listener.remove();listener=null;}
-  busy=false;current=null;board=null;playerInput=null;
+  if(resultDialog!=null){resultDialog.dismiss();resultDialog=null;}
+  busy=false;current=null;board=null;playerInput=null;resultButton=null;
   ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundResource(R.drawable.app_background);
   content=new LinearLayout(this);content.setOrientation(1);content.setGravity(Gravity.CENTER_HORIZONTAL);
   content.setPadding(dp(18),dp(30),dp(18),dp(24));scroll.addView(content);setContentView(scroll);
@@ -129,6 +131,8 @@ public final class MainActivity extends Activity {
    Toast.makeText(this,"Código copiado: "+RoomCode.display(gameId),Toast.LENGTH_SHORT).show();
   });
   detail=text(panel,"",15,R.color.text_secondary);
+  resultButton=button(panel,"Ver resultado / seguir jugando",true,()->showResult(true));
+  resultButton.setVisibility(View.GONE);
   button(panel,"Volver a la lista / salir",false,this::leave);
   text(panel,"Gira la pantalla: tu partida continúa.",12,R.color.text_secondary);
   listener=repo.games().document(gameId).addSnapshotListener(MetadataChanges.INCLUDE,(g,e)->{
@@ -137,7 +141,7 @@ public final class MainActivity extends Activity {
  }
  void leave(){
   if(busy)return;
-  if(current==null||!current.exists()||!java.util.Arrays.asList("waiting","playing").contains(current.getString("status"))){backToLobby();return;}
+  if(current==null||!current.exists()||"closed".equals(current.getString("status"))){backToLobby();return;}
   new AlertDialog.Builder(this).setTitle("Salir de la partida").setMessage("La partida se cerrará para ambos jugadores.").setNegativeButton("Continuar",null).setPositiveButton("Salir",(d,w)->{
    busy=true;render();repo.change(gameId,-2).addOnSuccessListener(r->{busy=false;getPreferences(0).edit().remove("gameV2Id").apply();gameId=null;if(!isDestroyed())lobby();}).addOnFailureListener(this::failure);
   }).show();
@@ -150,13 +154,57 @@ public final class MainActivity extends Activity {
   String mark=repo.uid().equals(current.getString("host"))?"X":repo.uid().equals(current.getString("guest"))?"O":"";
   String phase=current.getString("status"),turn=current.getString("turn");
   hostLabel.setText("X · "+host);guestLabel.setText("O · "+(guest==null||guest.isEmpty()?"Esperando":guest));
-  roomTitle.setText(current.getString("name"));
+  roomTitle.setText(current.getString("name")+" · Ronda "+OnlineRepository.round(current));
   game.restore(android.text.TextUtils.join("",(java.util.List<String>)current.get("board")));board.invalidate();
   String playerTurn="X".equals(turn)?host:guest;
   String s="waiting".equals(phase)?"Esperando al segundo jugador…":"playing".equals(phase)?(mark.equals(turn)?"¡Tu turno, "+playerTurn+"!":"Turno de "+playerTurn):"draw".equals(phase)?"¡Empate!":"closed".equals(phase)?"Partida cerrada":"Ganó "+("X".equals(phase)?host:guest);
   status.setText(!connected?"Sin conexión · Reconectando…":busy?"Enviando…":s);
-  detail.setText("waiting".equals(phase)?"Copia el código y envíalo a tu rival.":"playing".equals(phase)?"Eres "+mark+" · "+(mark.equals(turn)?"Elige una casilla libre.":"Espera la jugada del otro jugador."):"Vuelve a la lista para crear otra partida.");
+  boolean ended=OutcomeFeedback.ended(phase);
+  boolean accepted=Boolean.TRUE.equals(current.getBoolean(mark.equals("X")?"hostAgain":"guestAgain"));
+  detail.setText("waiting".equals(phase)?"Copia el código y envíalo a tu rival.":"playing".equals(phase)?"Eres "+mark+" · "+(mark.equals(turn)?"Elige una casilla libre.":"Espera la jugada del otro jugador."):ended?(accepted?"Aceptaste continuar. Esperando al otro jugador…":"¿Otra ronda? Ambos deben aceptar. El código se conserva."):"Partida cerrada. Vuelve a la lista.");
+  resultButton.setVisibility(ended?View.VISIBLE:View.GONE);
+  resultButton.setEnabled(connected&&!busy);
+  resultButton.setText(accepted?"Esperando al rival · ver resultado":"Ver resultado / seguir jugando");
   board.setEnabled(connected&&!busy&&!mark.isEmpty()&&"playing".equals(phase)&&mark.equals(turn));
+  if(!ended&&resultDialog!=null){resultDialog.dismiss();resultDialog=null;}
+  if(ended&&connected&&!busy&&!mark.isEmpty())showResult(false);
+ }
+ void showResult(boolean manual){
+  if(current==null||!current.exists()||!connected||!OutcomeFeedback.ended(current.getString("status"))||isFinishing()||isDestroyed())return;
+  String mark=repo.uid().equals(current.getString("host"))?"X":repo.uid().equals(current.getString("guest"))?"O":"";
+  if(mark.isEmpty())return;
+  long round=OnlineRepository.round(current);String phase=current.getString("status");
+  String key="result:"+gameId+":"+round+":"+repo.uid();
+  if(!manual&&getPreferences(0).getBoolean(key,false))return;
+  if(resultDialog!=null&&resultDialog.isShowing())return;
+  getPreferences(0).edit().putBoolean(key,true).apply();
+  boolean draw="draw".equals(phase),won=mark.equals(phase);
+  String me=current.getString(mark.equals("X")?"hostName":"guestName");
+  String rival=current.getString(mark.equals("X")?"guestName":"hostName");
+  boolean accepted=Boolean.TRUE.equals(current.getBoolean(mark.equals("X")?"hostAgain":"guestAgain"));
+  View panel=getLayoutInflater().inflate(R.layout.result_popup,null);
+  ((ImageView)panel.findViewById(R.id.result_icon)).setImageResource(draw?R.drawable.ic_rematch:R.drawable.ic_trophy);
+  ((TextView)panel.findViewById(R.id.result_title)).setText(draw?"¡Empate!":won?"¡Ganaste, "+me+"!":"Perdiste, "+me);
+  ((TextView)panel.findViewById(R.id.result_message)).setText((draw?"La ronda terminó en empate.":won?"Completaste tres en raya.":"Ganó "+rival+".")+
+   (accepted?"\nYa aceptaste continuar. Esperando al otro jugador.":"\n¿Quieres seguir jugando con el mismo código?"));
+  resultDialog=new AlertDialog.Builder(this).setView(panel).setCancelable(false)
+   .setPositiveButton(accepted?"Esperar al rival":"Seguir jugando",(d,w)->{if(!accepted)requestAgain(round);})
+   .setNegativeButton("Salir de esta partida",(d,w)->closeFromResult())
+   .setNeutralButton("Ver tablero",(d,w)->{}).create();
+  resultDialog.show();resultDialog.getWindow().setBackgroundDrawableResource(R.drawable.result_background);
+  String soundKey="sound:"+gameId+":"+round+":"+repo.uid();
+  if(!draw&&!getPreferences(0).getBoolean(soundKey,false)){
+   getPreferences(0).edit().putBoolean(soundKey,true).apply();
+   feedback.play(this,won?R.raw.victory:R.raw.defeat);
+  }
+ }
+ void requestAgain(long round){
+  if(busy||!connected)return;busy=true;render();
+  repo.again(gameId,round).addOnSuccessListener(r->{busy=false;if(!isDestroyed())render();}).addOnFailureListener(this::failure);
+ }
+ void closeFromResult(){
+  if(busy)return;busy=true;
+  repo.change(gameId,-2).addOnSuccessListener(r->{busy=false;getPreferences(0).edit().remove("gameV2Id").apply();gameId=null;if(!isDestroyed())lobby();}).addOnFailureListener(this::failure);
  }
  void failure(Exception error){
   busy=false;if(isDestroyed()||isFinishing())return;
@@ -172,5 +220,6 @@ public final class MainActivity extends Activity {
   if(gameId!=null)new AlertDialog.Builder(this).setMessage("¿Cerrar la app? Puedes reanudar esta partida al abrirla.").setPositiveButton("Cerrar",(d,w)->finish()).setNegativeButton("Continuar",null).show();
   else super.onBackPressed();
  }
- @Override protected void onDestroy(){if(listener!=null)listener.remove();super.onDestroy();}
+ @Override protected void onStop(){feedback.release();super.onStop();}
+ @Override protected void onDestroy(){if(listener!=null)listener.remove();if(resultDialog!=null)resultDialog.dismiss();feedback.release();super.onDestroy();}
 }
