@@ -21,8 +21,9 @@ function value(v){
 }
 function fields(data){return Object.fromEntries(Object.entries(data).map(([k,v])=>[k,value(v)]));}
 const host=await account(),guest=await account(),third=await account();
-const id='verification-'+crypto.randomUUID();
-const path='projects/'+project+'/databases/(default)/documents/games/'+id;
+const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const id=Array.from(crypto.randomBytes(8),b=>alphabet[b%alphabet.length]).join('');
+const path='projects/'+project+'/databases/(default)/documents/games_v2/'+id;
 async function commit(who,data,mask,precondition,created=false,expected=200){
  const write={update:{name:path,fields:fields(data)}};
  if(mask)write.updateMask={fieldPaths:mask};
@@ -33,16 +34,16 @@ async function commit(who,data,mask,precondition,created=false,expected=200){
  return body;
 }
 async function read(who){
- const r=await fetch(base+'/games/'+id,{headers:{Authorization:'Bearer '+who.token}});
+ const r=await fetch(base+'/games_v2/'+id,{headers:{Authorization:'Bearer '+who.token}});
  assert.equal(r.status,200);return r.json();
 }
 let created=false;
 try{
- await commit(host,{host:host.uid,guest:'',name:'Verificación nube · Reto 7',board:Array(9).fill(' '),turn:'X',status:'waiting'},null,{exists:false},true);created=true;
+ await commit(host,{host:host.uid,guest:'',name:'Verificación nube · Reto 7',code:id,hostName:'Ana',guestName:'',board:Array(9).fill(' '),turn:'X',status:'waiting'},null,{exists:false},true);created=true;
  let doc=await read(host);
  // Competing joins use the same server version: exactly one must succeed.
  const joins=await Promise.all([guest,third].map(async who=>{
-  const write={update:{name:path,fields:fields({guest:who.uid,status:'playing'})},updateMask:{fieldPaths:['guest','status']},currentDocument:{updateTime:doc.updateTime}};
+  const write={update:{name:path,fields:fields({guest:who.uid,guestName:'Luis',status:'playing'})},updateMask:{fieldPaths:['guest','guestName','status']},currentDocument:{updateTime:doc.updateTime}};
   const r=await fetch(base+':commit',{method:'POST',headers:{Authorization:'Bearer '+who.token,'Content-Type':'application/json'},body:JSON.stringify({writes:[write]})});return {who,status:r.status};
  }));
  assert.equal(joins.filter(j=>j.status===200).length,1,'Solo un jugador debe ocupar el segundo cupo');
@@ -59,7 +60,9 @@ try{
  for(const [who,cell,mark,next,status] of [[opponent,3,'O','X','playing'],[host,1,'X','O','playing'],[opponent,4,'O','X','playing'],[host,2,'X','O','X']]){
   board[cell]=mark;await commit(who,{board,turn:next,status},['board','turn','status']);
  }
- doc=await read(opponent);assert.equal(doc.fields.status.stringValue,'X');
+ doc=await read(opponent);assert.equal(doc.fields.status.stringValue,'X'); assert.equal(doc.fields.hostName.stringValue,'Ana'); assert.equal(doc.fields.guestName.stringValue,'Luis'); assert.equal(doc.fields.code.stringValue,id);
+ await commit(opponent,{hostName:'Cambio no autorizado'},['hostName'],null,false,403);
+ await commit(host,{code:'ABCD2345'},['code'],null,false,403);
  assert.deepEqual(doc.fields.board.arrayValue.values.map(v=>v.stringValue),board);
  board[8]='O';await commit(opponent,{board,turn:'X',status:'X'},['board','turn','status'],null,false,403);
  console.log('PASS: tres identidades, unión concurrente, cupo máximo, turnos, casillas ocupadas, participantes, victoria y lectura desde otro cliente.');

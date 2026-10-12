@@ -6,3 +6,4 @@ local.properties
 .cxx/
 app/src/main/assets/firebase.properties
 app/google-services.json
+*.apk

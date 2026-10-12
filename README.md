@@ -1,41 +1,42 @@
-# Reto 7 · Jugando Triqui Online
+# Reto 7 · Jugando Triqui Online · 1.1.0
 
-Extensión del proyecto Reto 6 de Hernando Vela. Android nativo Java, tablero Canvas y recursos gráficos originales. Dos dispositivos conectados al mismo proyecto Firebase juegan por Internet.
+Android nativo Java, basado en el Reto 6 de Hernando Vela. Usa Authentication anónimo y Cloud Firestore (default) del proyecto reto7jugandotriquionline.
 
-## Configuración Firebase
+## Instalar y jugar
 
-Proyecto: reto7jugandotriquionline.
+Ambos jugadores deben instalar TriquiOnline-Reto7-1.1.0.apk. Usa WhatsApp > Adjuntar > Documento para enviarlo. El destinatario descarga el archivo y lo abre desde Mis archivos > Descargas. Esta versión mantiene paquete y firma de 1.0.1 para actualizarla sin desinstalar.
 
-1. En Firebase, registra una aplicación Android con paquete `com.hernandovela.reto7`.
-2. Descarga google-services.json y guárdalo en `app/google-services.json`. Gradle lo incluye automáticamente en los assets y la app selecciona el cliente cuyo paquete es `com.hernandovela.reto7`. También admite `app/src/main/assets/firebase.properties` como alternativa. Esta app inicializa Firebase explícitamente; no necesita el plugin google-services.
-3. Authentication > Métodos de acceso > habilita Anónimo.
-4. Crea Cloud Firestore en modo producción, edición Standard, base (default).
-5. Publica el contenido de `firestore.rules` en la pestaña Reglas. También puedes ejecutar `firebase deploy --only firestore:rules --project reto7jugandotriquionline` con Firebase CLI y tu sesión autorizada.
+1. Escribe tu nombre (1 a 24 caracteres).
+2. Crea una partida. Se genera un código como ABCD-2345.
+3. Pulsa Copiar código y pégalo en WhatsApp para el otro jugador.
+4. El otro jugador escribe su nombre, pega el código y pulsa Ingresar a la partida.
+5. Ambos ven los nombres de X y O. X comienza; el tablero solo acepta el turno correspondiente.
 
-No se incluyen credenciales inventadas ni reglas de acceso público. Las reglas validan participantes, dos cupos, turno, una sola casilla vacía modificada y resultado real.
+Cualquiera puede crear partidas y copiar el código. La lista muestra salas esperando, pero para ingresar a la partida de otra persona hay que escribir el código. Puedes reanudar tus salas desde la lista. Los códigos no constituyen una contraseña privada: las salas siguen siendo listables para usuarios autenticados.
 
-## Android Studio y dos dispositivos
+La app guarda el nombre y la partida actual al cerrar o girar. Salir cierra la partida para ambos. Para jugar otra ronda, vuelve a la lista y crea una partida con nuevo código. Los dispositivos solo necesitan Internet, pueden estar en redes distintas.
 
-Abre la carpeta del proyecto en Android Studio. Usa el JDK incorporado y el SDK Android 37 instalado. Sincroniza Gradle y ejecuta app en un AVD con Internet. Instala el mismo APK en el teléfono del segundo jugador (Android 7 o posterior).
+## Android Studio
 
-El APK se genera en `app/build/outputs/apk/debug/app-debug.apk`.
+Abre este proyecto y usa el JDK incorporado de Android Studio y SDK Android 36. minSdk 24 (Android 7).
 
-1. Ambos abren la aplicación con Internet.
-2. El primer jugador crea una partida y espera como X.
-3. El segundo ve esa partida en la lista y pulsa Unirse; juega como O.
-4. X comienza. El tablero solo acepta jugadas del jugador al que corresponde el turno.
-5. Victoria, empate o salida se reflejan en ambos dispositivos. Para otra partida, vuelven a la lista y crean una nueva.
+- app/google-services.json contiene la configuración local del paquete com.hernandovela.reto7 y no se publica en Git.
+- FirebaseConfig inicializa el SDK explícitamente; Gradle copia la configuración como asset.
+- gradlew.bat assembleDistribution testDebugUnitTest genera el APK firmado en app/build/outputs/apk/distribution/app-distribution.apk.
+- La variante distribution usa la misma clave local de las versiones anteriores; no es una publicación en Play Store.
 
-El teléfono puede estar en otra red; no se utiliza localhost ni una IP del emulador. Firestore media todas las operaciones. Las transacciones evitan el tercer jugador y movimientos simultáneos. Al perder conexión, el tablero se bloquea hasta recibir datos del servidor. Cerrar la app conserva la partida; Salir la cierra para ambos. Las salas abandonadas al cerrar la app quedan disponibles para reanudar; no hay eliminación automática.
+La versión visible proviene de BuildConfig.VERSION_NAME y VERSION_CODE, definidos en app/build.gradle.kts. Consulta CHANGELOG.md.
 
-## Validación
+## Firebase y compatibilidad
 
-`gradlew.bat assembleDebug testDebugUnitTest`
+Authentication anónimo habilitado y reglas firestore.rules publicadas. Las versiones 1.1 usan games_v2; los documentos usan el código normalizado como ID y almacenan hostName/guestName. Una transacción crea cada código sin sobrescribir otra sala. La unión también es transaccional para evitar un tercer jugador.
 
-Las pruebas heredadas validan las reglas locales del tablero. La verificación de Firebase con dos dispositivos requiere configurar el proyecto y publicar las reglas; no debe considerarse completada solo porque compila el APK.
+Las reglas mantienen games para los APK 1.0.x. Ambas personas deben actualizar a 1.1.0 para utilizar códigos y nombres; las partidas antiguas no se migran ni se borran.
 
-Con google-services.json, Authentication anónimo y las reglas publicadas, ejecuta `node scripts/verify-cloud.mjs`. Verifica tres identidades independientes, competencia por el segundo cupo, rechazo de un tercer jugador, turno incorrecto, sobrescritura de casilla, cambio de participante, victoria y lectura desde el otro cliente. Crea una partida de verificación identificada por su nombre; queda finalizada o cerrada en la base.
+## Verificación
 
-`gradlew.bat connectedDebugAndroidTest` ejecuta la prueba Android contra Firebase: inicio anónimo, creación y lectura del servidor, recreación de Activity y cierre de una sala de prueba. Requiere un emulador o dispositivo conectado y Firebase configurado. La prueba antigua de sonidos del modo contra la computadora fue reemplazada porque sus controles no existen en la modalidad online.
+- gradlew.bat testDebugUnitTest: reglas del tablero, normalización y validación de códigos y nombres.
+- node scripts/verify-cloud.mjs: dos cupos, unión concurrente, nombres compartidos, rechazo de cambios de identidad/código, turnos y victoria contra la nube real.
+- Prueba Android OnlineSmokeInstrumentation: dos usuarios, entrada con código formateado, nombres en pantalla, giro y jugadas sincronizadas.
 
-Documentación: [transacciones Firestore](https://firebase.google.com/docs/firestore/manage-data/transactions) y [autenticación anónima Android](https://firebase.google.com/docs/auth/android/anonymous-auth).
+Las pruebas crean salas identificadas como verificación y las finalizan o cierran. Las cuentas anónimas de prueba permanecen en Firebase.

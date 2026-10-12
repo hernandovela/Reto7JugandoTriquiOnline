@@ -6,12 +6,13 @@ android {
         applicationId = "com.hernandovela.reto7"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.1.0"
         testInstrumentationRunner = "com.hernandovela.reto7.OnlineSmokeInstrumentation"
     }
     signingConfigs.getByName("debug") { enableV1Signing = true; enableV2Signing = true }
     buildTypes { create("distribution") { initWith(getByName("release")); signingConfig = signingConfigs.getByName("debug"); isDebuggable = false; isMinifyEnabled = false } }
+    buildFeatures { buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
